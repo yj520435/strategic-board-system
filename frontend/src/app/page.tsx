@@ -8,25 +8,26 @@ import {
   IconButton,
   ToggleButton,
   ToggleButtonGroup,
+  toggleButtonGroupClasses,
   Toolbar,
   Typography,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import styles from './page.module.css';
 import Board from './board';
-import { blue, grey } from '@mui/material/colors';
+import { grey } from '@mui/material/colors';
 
 declare module '@mui/material/styles' {
   interface Theme {
     status: {
-      dark: string;
+      black: string;
       white: string;
     };
   }
   // allow configuration using `createTheme()`
   interface ThemeOptions {
     status?: {
-      dark?: string;
+      black?: string;
       white: string;
     };
   }
@@ -34,33 +35,50 @@ declare module '@mui/material/styles' {
 
 const theme = createTheme({
   status: {
-    dark: blue[900],
+    black: grey[900],
     white: grey[50],
   },
 });
 
 const CustomAppBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: theme.status.dark,
+  backgroundColor: theme.status.black,
 }));
 
-const MyToggleButton = styled(ToggleButton)(({ theme }) => ({
+const CustomToggleButton = styled(ToggleButton)(({ theme }) => ({
   borderColor: theme.status.white,
   fontFamily: 'Roboto',
-  fontSize: 14,
-  color: theme.status.white,
+  fontSize: 13,
+  color: theme.status.black,
+  backgroundColor: theme.status.white,
   fontWeight: 600,
-  padding: '5px 20px',
+  padding: '3px 10px',
   '&.Mui-selected': {
-    color: theme.status.white,
-    backgroundColor: '#FFFFFF60',
+    backgroundColor: '#00000030',
   },
+}));
+
+const CustomToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
+  backgroundColor: 'white',
+  [`& .${toggleButtonGroupClasses.grouped}`]: {
+    margin: theme.spacing(0.5),
+    border: 0,
+    borderRadius: theme.shape.borderRadius,
+    [`&.${toggleButtonGroupClasses.disabled}`]: {
+      border: 0,
+    },
+  },
+  [`& .${toggleButtonGroupClasses.middleButton},& .${toggleButtonGroupClasses.lastButton}`]:
+    {
+      marginLeft: -1,
+      borderLeft: '1px solid transparent',
+    },
 }));
 
 export default function Home() {
   const [strategy, setStrategy] = React.useState('page');
 
   const handleStrategy = (event: unknown, value: string) => {
-    setStrategy(value);
+    if (value) setStrategy(value);
   };
 
   return (
@@ -86,16 +104,16 @@ export default function Home() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Board
             </Typography>
-            <ToggleButtonGroup
+            <CustomToggleButtonGroup
               value={strategy}
               exclusive
               onChange={handleStrategy}
               aria-label="text alignment"
               size="small"
             >
-              <MyToggleButton value="page">PAGE</MyToggleButton>
-              <MyToggleButton value="scroll">SCROLL</MyToggleButton>
-            </ToggleButtonGroup>
+              <CustomToggleButton value="page">PAGE</CustomToggleButton>
+              <CustomToggleButton value="scroll">SCROLL</CustomToggleButton>
+            </CustomToggleButtonGroup>
           </Toolbar>
         </CustomAppBar>
         <Box className={styles.bg}>
