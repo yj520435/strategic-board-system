@@ -33,7 +33,7 @@ public class PostController {
     @RequestParam("page") @Valid Integer page,
     @RequestParam("size") @Valid Integer size
   ) {
-    PageRequest pageRequest = PageRequest.of(page, size, Sort.by("id").descending());
+    PageRequest pageRequest = PageRequest.of(page - 1, size, Sort.by("id").descending());
     Slice<PostDto> list = postService.getList(type, pageRequest);
     return ResponseEntity.ok(ApiResponse.success(list));
   }
