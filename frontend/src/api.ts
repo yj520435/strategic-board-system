@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: '/pt',
+  baseURL: 'http://localhost:8080/pt',
 });
 
 export async function getList(strategy: string, page: number, size: number) {
