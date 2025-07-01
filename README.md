@@ -1,5 +1,7 @@
 # 전략 패턴 기반 게시판 시스템
 
+![board](https://github.com/user-attachments/assets/0f6df3fe-6b37-4183-a9e0-85f86cfcec3a)
+
 ## 개요
 
 전략 패턴을 활용하여 로딩 전략(페이지네이션 또는 무한 스크롤)을 선택적으로 제공하는 게시판 시스템입니다.
