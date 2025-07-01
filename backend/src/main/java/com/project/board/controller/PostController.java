@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/pt")
 @RequiredArgsConstructor
-// @CrossOrigin
+@CrossOrigin
 public class PostController {
 
   private final PostService postService;
