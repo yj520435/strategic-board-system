@@ -24,6 +24,6 @@ public class PaginationStrategy implements LoadStrategy {
 
   @Override
   public Page<Post> load(PageRequest pageRequest) {
-    return postRepository.findPageBy(pageRequest);
+    return postRepository.findAll(pageRequest);
   }
 }

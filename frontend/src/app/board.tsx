@@ -12,9 +12,12 @@ import {
   styled,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './page.module.css';
-import axios from 'axios';
+import { formatDateTime } from '@/utils';
+import { getList } from '@/api';
+
+const PAGE_SIZE = 9;
 
 interface Post {
   id: number;
@@ -24,19 +27,6 @@ interface Post {
   createdAt: string;
 }
 
-function formatDateTime(args: string) {
-  const date = new Date(args);
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
 const CardContentNoPadding = styled(CardContent)(`
   padding: 16px;
   &:last-child {
@@ -44,97 +34,114 @@ const CardContentNoPadding = styled(CardContent)(`
   };
 `);
 
-const PAGE_SIZE = 9;
-
-const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080/pt',
-});
-
-const fetchData = async (strategy: string, page: number) => {
-  const response = await axiosInstance.get('/posts', {
-    params: {
-      strategy: strategy.toUpperCase(),
-      page: page - 1,
-      size: PAGE_SIZE,
-    },
-  });
-  console.log('Fetch Data: ', response.data);
-  return response.data;
-};
-
 export default function Board({ strategy }: Readonly<{ strategy: string }>) {
   const [page, setPage] = useState<number>(1);
   const [items, setItems] = useState<Array<Post>>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // const [totalPages, setTotalPages] = useState(1);
-
-  const mountedRef = useRef(false);
-  const strategyRef = useRef(strategy);
-  const totalPagesRef = useRef(1);
-  const [loadedPage, setLoadedPage] = useState(0);
 
   const loaderRef = useRef(null);
-  const handleChange = async (event: React.ChangeEvent<unknown>, value: number) => {
+  const mountedRef = useRef(false);
+
+  const strategyRef = useRef(strategy);
+  const totalPagesRef = useRef(1);
+  const totalElementsRef = useRef(0);
+  const loadedPageRef = useRef(1);
+
+  // 스크롤 이동 이벤트
+  function scrollTo(to: 'top' | 'bottom') {
     const rootDiv = document.querySelector('.MuiBox-root');
-    if (rootDiv) rootDiv.scrollTo({ top: 0, behavior: 'smooth' });
-    // console.log(rootDiv);
+    if (!rootDiv) return;
+
+    if (to === 'top') {
+      rootDiv.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      const height = rootDiv.scrollHeight - (rootDiv as HTMLElement).offsetHeight - 420;
+      rootDiv.scrollTo({ top: height, behavior: 'smooth' });
+    }
+  }
+
+  // 페이지네이션 이벤트
+  const handleChange = async (event: React.ChangeEvent<unknown>, value: number) => {
+    scrollTo('top');
     setPage(value);
   };
 
+  // 마운트 시 스켈레톤 컴포넌트 로드
   useEffect(() => {
     mountedRef.current = true;
   }, []);
 
-  // useEffect(() => {
-  //   setPage(1);
-  //   setItems([]);
-  // }, [strategy]);
-
+  // 페이지 변경 시 데이터 로드
   useEffect(() => {
-    console.log(
-      `Load "${page}" page with "${strategy}" Strategy, Loaded page is "${loadedPage}"`
-    );
+    if (strategy === 'scroll') return;
 
-    if (strategy === 'scroll' && page > totalPagesRef.current) {
-      setIsLoading(false);
-      return;
-    }
+    getList(strategy, page, PAGE_SIZE)
+      .then((res) => {
+        const data = res?.data?.content ?? [];
+        setItems(data);
 
-    if (page !== loadedPage) {
-      fetchData(strategy, page)
+        if (strategy === 'page') {
+          totalPagesRef.current = res?.data?.totalPages;
+          totalElementsRef.current = res?.data?.totalElements;
+        }
+
+        loadedPageRef.current = page;
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  }, [page, strategy]);
+
+  // 페이지 → 스크롤 전환 시 이전 데이터 로드
+  useEffect(() => {
+    if (strategy === 'scroll') {
+      if (loadedPageRef.current === 1) return;
+
+      getList(strategy, 1, PAGE_SIZE * (loadedPageRef.current - 1))
         .then((res) => {
           const data = res?.data?.content ?? [];
-
-          if (strategy === 'page') {
-            setItems(data);
-            totalPagesRef.current = res?.data?.totalPages;
-          } else {
-            setItems((prev) => [...prev, ...data]);
-          }
-
-          setLoadedPage(page);
-          setIsLoading(false);
+          setItems((prev) => [...data, ...prev]);
         })
         .catch((err) => {
           console.log(err);
+        })
+        .finally(() => {
+          setTimeout(() => {
+            scrollTo('bottom');
+          }, 500);
         });
     }
-  }, [page, strategy, loadedPage]);
+  }, [strategy]);
 
-  useEffect(() => {
-    console.log(`Observe with "${strategy}" startegy`);
-    strategyRef.current = strategy;
+  // 옵저버 콜백
+  const load = useCallback(async () => {
+    if (isLoading) return;
 
-    if (strategy !== 'scroll') {
+    if (page > totalPagesRef.current) {
+      setPage(totalPagesRef.current);
       return;
     }
 
+    setIsLoading(true);
+    const res = await getList('scroll', page + 1, PAGE_SIZE);
+    const data = res?.data?.content ?? [];
+    setItems((prev) => [...prev, ...data]);
+    setPage((d) => d + 1);
+    loadedPageRef.current = page;
+    setIsLoading(false);
+  }, [page, isLoading]);
+
+  // 옵저버
+  useEffect(() => {
+    strategyRef.current = strategy;
+
+    const isLastPage = loadedPageRef.current === totalPagesRef.current;
+    if (strategy !== 'scroll' || isLastPage) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsLoading(true);
-          setTimeout(() => setPage((prev: number) => prev + 1), 1000);
-        }
+        if (entry.isIntersecting) load();
       },
       { threshold: 1 }
     );
@@ -145,25 +152,34 @@ export default function Board({ strategy }: Readonly<{ strategy: string }>) {
     return () => {
       if (target) observer.unobserve(target);
     };
-  }, [loaderRef, strategy]);
+  }, [strategy, load]);
 
   return (
     <Box className={styles.cards}>
+      <Box
+        width="100%"
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          py: 3,
+        }}
+      >
+        <Typography fontWeight={600} mx={1}>
+          {strategy} ({loadedPageRef.current} of {totalPagesRef.current})
+        </Typography>
+        <Typography fontWeight={600} mx={1}>
+          total: {totalElementsRef.current}
+        </Typography>
+      </Box>
       {!mountedRef.current ? (
         <Grid container spacing={1}>
-          {new Array(9).fill(true).map((x, i) => (
-            <Skeleton variant="rounded" width={327} height={315} key={i} />
+          {new Array(PAGE_SIZE).fill(true).map((x, i) => (
+            <Skeleton variant="rounded" width={322} height={360} key={i} />
           ))}
         </Grid>
       ) : (
         <Grid container spacing={2}>
-          {/* {isLoading
-          ? new Array(PAGE_SIZE).map((x, i) => (
-              <Skeleton variant="rounded" width={200} height={315} key={i}>
-                {x}
-              </Skeleton>
-            ))
-          : null} */}
           {items.map((x: Post) => (
             <Grid size={4} key={x.id}>
               <Card variant="outlined" raised sx={{ height: 360 }}>
@@ -172,10 +188,12 @@ export default function Board({ strategy }: Readonly<{ strategy: string }>) {
                     {formatDateTime(x.createdAt)}
                   </Typography>
                   <Typography sx={{ fontSize: 30, fontWeight: 'bold' }}>
-                    {x.title}
+                    {x.title} #{x.id}
                   </Typography>
                   <Typography>{x.author}</Typography>
-                  <Typography paddingY={3}>{x.content}</Typography>
+                  <Typography paddingY={3} height={190} className={styles.ellipsis}>
+                    {x.content}
+                  </Typography>
                 </CardContentNoPadding>
                 <CardActions sx={{ justifyContent: 'right' }}>
                   <Button size="small">more</Button>
@@ -183,14 +201,14 @@ export default function Board({ strategy }: Readonly<{ strategy: string }>) {
               </Card>
             </Grid>
           ))}
+          <Grid size={12}>
+            <div ref={loaderRef} className={styles.loader}>
+              {isLoading && page <= totalPagesRef.current ? <CircularProgress /> : null}
+            </div>
+          </Grid>
         </Grid>
       )}
-
-      {'scroll' === strategy ? (
-        <div ref={loaderRef} className={styles.loader}>
-          {isLoading && page <= totalPagesRef.current ? <CircularProgress /> : null}
-        </div>
-      ) : (
+      {'page' === strategy ? (
         <Stack
           spacing={2}
           sx={{ alignItems: 'center', paddingTop: 5 }}
@@ -198,7 +216,7 @@ export default function Board({ strategy }: Readonly<{ strategy: string }>) {
         >
           <Pagination count={totalPagesRef.current} page={page} onChange={handleChange} />
         </Stack>
-      )}
+      ) : null}
     </Box>
   );
 }
