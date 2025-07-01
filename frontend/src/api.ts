@@ -8,7 +8,7 @@ export async function getList(strategy: string, page: number, size: number) {
   const response = await axiosInstance.get('/posts', {
     params: {
       strategy: strategy.toUpperCase(),
-      page: page - 1,
+      page,
       size,
     },
   });
